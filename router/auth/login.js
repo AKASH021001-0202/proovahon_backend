@@ -8,23 +8,21 @@ const LoginRouter = express.Router();
 
 
 LoginRouter.post("/", async (req, res) => { // Added comma here
-  const { email, password } = req.body;
+  const { phone, otp } = req.body;
 
   try {
-    const user = await Usermodel.findOne({ email });
+    const user = await Usermodel.findOne({ phone });
 
     if (!user) { // Check for user instead of email
       return res.status(404).json({ message: "User not found" }); // Added return
     }
 
-    if (!user.isActive) {
-      return res.status(400).json({ msg: 'Please activate your account' });
-    }
+    
 
-    const isMatch = await bcrypt.compare(password, user.password); // Use bcrypt.compare with await
+    const isMatch = await bcrypt.compare(otp, user.password); // Use bcrypt.compare with await
 
     if (!isMatch) {
-      return res.status(400).json({ msg: "Invalid password" }); // Added return
+      return res.status(400).json({ msg: "Invalid otp" }); // Added return
     }
 
     if (!process.env.JWT_SECRET) { // Ensure JWT_SECRET is set
