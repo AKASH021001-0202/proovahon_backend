@@ -40,6 +40,56 @@ const userSchema = new mongoose.Schema(
 
 
 const Usermodel = mongoose.model("User", userSchema, "Users");
+const brandSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    img: {
+      type: String,
+      required: true,
+    },
+    createdOn: {
+      type: Date,
+      default: Date.now,
+    },
+    models: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Model',
+      },
+    ],
+  },
+  { timestamps: true }
+);
+
+const Brand = mongoose.model('Brand', brandSchema, 'Brands');
+
+
+const modelSchema = new mongoose.Schema(
+  {
+    brand: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Brand', // Reference to Brand schema
+      required: true,
+    },
+    modelName: {
+      type: String,
+      required: true,
+    },
+    year: {
+      type: Number,
+      required: true,
+    },
+  },
+  { timestamps: true }
+);
+
+const Model = mongoose.model('Model', modelSchema, 'Models');
+
+
 const ImageSchema = new mongoose.Schema({
   original: { type: String, required: true },
   thumbnail: { type: String, required: true },
@@ -78,4 +128,4 @@ const ProductSchema = new mongoose.Schema({
 
 const Product = mongoose.model("Product", ProductSchema,"Products");
 
-export { Usermodel, Product };
+export { Usermodel, Product,Model,Brand };

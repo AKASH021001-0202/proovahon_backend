@@ -11,6 +11,8 @@ import mongooseDb from './db.utils/mongoose-connection.js';
 import RegisterRouter from './router/auth/register.js';
 import LoginRouter from './router/auth/login.js';
 import ProductRouter from './router/uploads/product.js';
+import Brandrouter from './router/uploads/Brand.js';
+import Modelrouter from './router/uploads/model-brand.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -48,6 +50,8 @@ server.use(customMiddleware);
 server.use('/register', RegisterRouter);
 server.use('/login', LoginRouter);
 server.use('/product', ProductRouter);
+server.use('/brand', Brandrouter);
+server.use('/models', Modelrouter);
 
 
 
