@@ -40,54 +40,51 @@ const userSchema = new mongoose.Schema(
 
 
 const Usermodel = mongoose.model("User", userSchema, "Users");
+
+
+
+// Vehicle Category Schema
+const vehicleCategorySchema = new mongoose.Schema(
+  {
+    id: { type: String, default: uuidv4, unique: true },
+    vehicleCategory: { type: String, required: true, unique: true, trim: true,sparse:true },
+    img: { type: String, required: true },
+    slug: { type: String, required: true },
+  },
+  { timestamps: true }
+
+);
+vehicleCategorySchema.pre('save', function(next) {
+  if (!this.vehicleCategory || this.vehicleCategory.trim() === '') {
+    this.vehicleCategory = 'default-category'; // Set a default category
+  }
+  next();
+});
+const VehicleCategory = mongoose.model("VehicleCategory", vehicleCategorySchema, "VehicleCategories");
+
+// Brand Schema
 const brandSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    img: {
-      type: String,
-      required: true,
-    },
-    createdOn: {
-      type: Date,
-      default: Date.now,
-    },
-    models: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Model',
-      },
-    ],
+    vehicle_make: { type: String, required: true, unique: true },
+    img: { type: String, required: true },
+    category: { type: mongoose.Schema.Types.ObjectId, ref: "VehicleCategory", required: true },
+    createdOn: { type: Date, default: Date.now },
+    vehicle_model: [{ type: mongoose.Schema.Types.ObjectId, ref: "VehicleModel" }],
   },
   { timestamps: true }
 );
+const VehicleBrand = mongoose.model("VehicleBrand", brandSchema, "VehicleBrands");
 
-const Brand = mongoose.model('Brand', brandSchema, 'Brands');
-
-
-const modelSchema = new mongoose.Schema(
+// Vehicle Model Schema
+const vehicleModelSchema = new mongoose.Schema(
   {
-    brand: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Brand', // Reference to Brand schema
-      required: true,
-    },
-    modelName: {
-      type: String,
-      required: true,
-    },
-    year: {
-      type: Number,
-      required: true,
-    },
+    vehicle_make: { type: mongoose.Schema.Types.ObjectId, ref: "Brand", required: true },
+    vehicle_model: { type: String, required: true },
+    year: { type: Number, required: true },
   },
   { timestamps: true }
 );
-
-const Model = mongoose.model('Model', modelSchema, 'Models');
+const VehicleModel = mongoose.model("VehicleModel", vehicleModelSchema, "VehicleModels");
 
 
 const ImageSchema = new mongoose.Schema({
@@ -128,4 +125,4 @@ const ProductSchema = new mongoose.Schema({
 
 const Product = mongoose.model("Product", ProductSchema,"Products");
 
-export { Usermodel, Product,Model,Brand };
+export { Usermodel, Product,VehicleModel,VehicleBrand ,VehicleCategory};

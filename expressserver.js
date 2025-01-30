@@ -1,5 +1,3 @@
-// server.js (Main Server Setup)
-
 import express from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
@@ -11,8 +9,9 @@ import mongooseDb from './db.utils/mongoose-connection.js';
 import RegisterRouter from './router/auth/register.js';
 import LoginRouter from './router/auth/login.js';
 import ProductRouter from './router/uploads/product.js';
-import Brandrouter from './router/uploads/Brand.js';
-import Modelrouter from './router/uploads/model-brand.js';
+import VehicleBrandRouter from './router/uploads/Brand.js';
+import VehicleModelRouter from './router/uploads/model-brand.js';
+import categoryRouter from './router/uploads/category.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -37,10 +36,7 @@ const customMiddleware = (req, res, next) => {
   next();
 };
 
-
-
-
-// Static folder for uploads
+// Serve uploaded images statically
 server.use('/uploads', express.static(path.resolve('uploads')));
 
 // Apply middleware globally
@@ -50,10 +46,9 @@ server.use(customMiddleware);
 server.use('/register', RegisterRouter);
 server.use('/login', LoginRouter);
 server.use('/product', ProductRouter);
-server.use('/brand', Brandrouter);
-server.use('/models', Modelrouter);
-
-
+server.use('/brand', VehicleBrandRouter);
+server.use('/vehicle-categories', categoryRouter);
+server.use('/models', VehicleModelRouter);
 
 // Start server
 const port = process.env.PORT || 8000;
