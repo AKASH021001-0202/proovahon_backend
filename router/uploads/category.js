@@ -31,7 +31,6 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // 🚀 CREATE Category (with image upload)
-// 🚀 CREATE Category (with image upload)
 categoryRouter.post('/', upload.single('img'), async (req, res) => {
   try {
     const { vehicleCategory } = req.body;
