@@ -47,7 +47,7 @@ server.use('/register', RegisterRouter);
 server.use('/login', LoginRouter);
 server.use('/product', ProductRouter);
 server.use('/brand', VehicleBrandRouter);
-server.use('/vehicle-categories', categoryRouter);
+server.use('/categories', categoryRouter);
 server.use('/models', VehicleModelRouter);
 
 // Start server

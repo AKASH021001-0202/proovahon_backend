@@ -1,5 +1,10 @@
 import express from "express";
-import { VehicleBrand, VehicleCategory, VehicleModel } from "../../db.utils/model.js";
+import {
+
+  Brand,
+  Category,
+  VehicleModel,
+} from "../../db.utils/model.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -7,21 +12,21 @@ import mongoose from "mongoose";
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadDir = path.resolve('uploads/models');
+    const uploadDir = path.resolve("uploads/models");
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    const filePath = path.resolve('uploads/models', file.originalname);
-    
+    const filePath = path.resolve("uploads/models", file.originalname);
+
     // Check if the file already exists
     if (fs.existsSync(filePath)) {
-      return cb(new Error('File already exists'));
+      return cb(new Error("File already exists"));
     }
 
-    cb(null, Date.now() + '-' + file.originalname); // Use timestamp to prevent conflicts
+    cb(null, Date.now() + "-" + file.originalname); // Use timestamp to prevent conflicts
   },
 });
 
@@ -34,60 +39,69 @@ const VehicleModelRouter = express.Router();
 // Get all vehicle models
 VehicleModelRouter.get("/", async (req, res) => {
   try {
-    const models = await VehicleModel.find() 
+    const models = await VehicleModel.find();
     res.json(models);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Create a new vehicle model
 
 VehicleModelRouter.post("/", upload.single("img"), async (req, res) => {
   try {
-    const { vehicle_make, vehicle_model, year } = req.body;
-    
-    // Log the incoming data
-    console.log("Received brand:", vehicle_make);
+    const { brand, model, year } = req.body;
 
-    // Find the brand to get its associated category
-    const foundBrand = await VehicleBrand.findById(vehicle_make).populate("category");
+    console.log("Received brand:", brand);
 
-    if (!foundBrand) {
+    // 🔍 Find the brand by name and get its category
+    const Brand = await Brand.findOne({ brand }).populate("category");
+
+    if (!Brand) {
       return res.status(400).json({ error: "Brand not found" });
     }
 
-    // Automatically set the category from the brand's category
-    const categoryId = foundBrand.category;
-
-    if (!categoryId) {
-      return res.status(400).json({ error: "Brand does not have an associated category" });
+    // 📌 Ensure an image was uploaded
+    if (!req.file) {
+      return res.status(400).json({ error: "Image is required" });
     }
 
-    // Proceed with creating the model
+    // 📌 Construct the full image path
+    const imagePath = `/uploads/models/${req.file.filename}`;
+
+    // ✅ Save the brand name instead of ObjectId
     const newModel = new VehicleModel({
-      vehicle_make,
-      vehicle_model,
-      category: categoryId,
+      brand: Brand.brand, // ✅ Save name instead of ObjectId
+      model,
+    
       year,
-      img: req.file ? `/uploads/models/${req.file.filename}` : undefined, // Handle image upload
+      img: imagePath,
     });
 
     await newModel.save();
-    res.status(201).json({ message: "Model added successfully" });
+
+    // 🔄 Push the new model name into the brand's model array
+    await Brand.updateOne(
+      { _id: Brand._id },
+      { $addToSet: { model } } // Ensures unique values are added
+    );
+
+    res.status(201).json({ message: "Model added successfully", data: newModel });
+
   } catch (error) {
     console.error("Error during model creation:", error);
     res.status(400).json({ error: error.message });
   }
 });
 
+
+
 // Update a vehicle model
 VehicleModelRouter.put("/:id", upload.single("img"), async (req, res) => {
   try {
     const { id } = req.params;
-    const { vehicle_make, vehicle_model, category, year } = req.body;
+    const { brand, category, year } = req.body;
 
-    const updateData = { vehicle_make, vehicle_model, category, year };
+    const updateData = { brand, model, category, year };
 
     if (req.file) {
       updateData.img = `/uploads/models/${req.file.filename}`;

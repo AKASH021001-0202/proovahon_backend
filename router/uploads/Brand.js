@@ -1,5 +1,5 @@
 import express from "express";
-import { VehicleBrand, VehicleCategory } from "../../db.utils/model.js";
+import { Category, Brand } from "../../db.utils/model.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -9,47 +9,58 @@ const VehicleBrandRouter = express.Router();
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadDir = path.resolve('uploads/brand');
+    const uploadDir = path.resolve("uploads/brand");
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    const filePath = path.resolve('uploads/brand', file.originalname);
-    
+    const filePath = path.resolve("uploads/brand", file.originalname);
+
     // Check if the file already exists
     if (fs.existsSync(filePath)) {
-      return cb(new Error('File already exists'));
+      return cb(new Error("File already exists"));
     }
 
-    cb(null, Date.now() + '-' + file.originalname); // Use timestamp to prevent conflicts
+    cb(null, Date.now() + "-" + file.originalname); // Use timestamp to prevent conflicts
   },
 });
 
-
 const upload = multer({ storage: storage });
 
-// 🚀 CREATE Category (with image upload)
+// 🚀 CREATE Brand
 VehicleBrandRouter.post("/", upload.single("img"), async (req, res) => {
   try {
-    let { vehicle_make, category } = req.body;
-    const img = req.file ? `/uploads/brand/${req.file.filename}` : '';
+    let { brand, category } = req.body;
+    console.log(req.body);
+    const img = req.file ? `/uploads/brand/${req.file.filename}` : "";
 
-    // 🛑 Find category by name and get its ObjectId
-    const categoryDoc = await VehicleCategory.findById(category);
+    // 🛑 Check if brand already exists
+    const existingBrand = await Brand.findOne({ brand });
+    if (existingBrand) {
+      return res.status(400).json({ error: "Brand already exists" });
+    }
+
+    // 🛑 Find category by ID
+    const categoryDoc = await Category.findById(category);
     if (!categoryDoc) {
       return res.status(400).json({ error: "Invalid category selected." });
     }
 
-    // Create new brand with correct ObjectId reference
-    const newBrand = new VehicleBrand({
-      vehicle_make,
+    // ✅ Create new brand and store category ID reference
+    const newBrand = new Brand({
+      brand,
       img,
-      category: categoryDoc._id, // Store ObjectId instead of string
+      category: categoryDoc._id, // Store category's ObjectId reference in the Brand
     });
 
     await newBrand.save();
+
+    // ✅ Push the new brand's name into the category's brand array
+    categoryDoc.brand.push(newBrand.brand); // Push the brand name
+    await categoryDoc.save();
+
     res.status(201).json(newBrand);
   } catch (error) {
     console.error("Error creating brand:", error);
@@ -57,10 +68,26 @@ VehicleBrandRouter.post("/", upload.single("img"), async (req, res) => {
   }
 });
 
+// 📚 GET All Brands with only brand and category.category fields
 VehicleBrandRouter.get("/", async (req, res) => {
   try {
-    const brands = await VehicleBrand.find().populate("category vehicle_model");
+    // Projecting only brand and category.category fields
+    const brands = await Brand.find()
+      .populate('category', 'category') 
+      .select('brand category img'); 
+    
     res.status(200).json(brands);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// 🔍 GET Single Brand by ID
+VehicleBrandRouter.get("/:id", async (req, res) => {
+  try {
+    const brand = await Brand.findById(req.params.id).populate("category");
+    if (!brand) return res.status(404).json({ error: "Brand not found" });
+    res.status(200).json(brand);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -69,7 +96,7 @@ VehicleBrandRouter.get("/", async (req, res) => {
 // 🚀 UPDATE Brand (including image update)
 VehicleBrandRouter.put("/:id", upload.single("img"), async (req, res) => {
   try {
-    const brand = await VehicleBrand.findById(req.params.id);
+    const brand = await Brand.findById(req.params.id);
     if (!brand) return res.status(404).json({ message: "Brand not found" });
 
     if (req.file) {
@@ -80,7 +107,11 @@ VehicleBrandRouter.put("/:id", upload.single("img"), async (req, res) => {
       req.body.img = req.file.path;
     }
 
-    const updatedBrand = await VehicleBrand.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updatedBrand = await Brand.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
     res.status(200).json(updatedBrand);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -90,15 +121,27 @@ VehicleBrandRouter.put("/:id", upload.single("img"), async (req, res) => {
 // 🚀 DELETE Brand
 VehicleBrandRouter.delete("/:id", async (req, res) => {
   try {
-    const brand = await VehicleBrand.findByIdAndDelete(req.params.id);
-    if (!brand) return res.status(404).json({ message: "Brand not found" });
-    // Optionally, delete the image file here as well
-    if (brand.img && fs.existsSync(brand.img)) {
-      fs.unlinkSync(brand.img);
+    const brand = await Brand.findById(req.params.id);
+    if (!brand) {
+      return res.status(404).json({ error: "Brand not found" });
     }
-    res.status(200).json({ message: "Brand deleted" });
+
+    // 🛑 Find the category and remove the brand's NAME from the brands array
+    const category = await Category.findById(brand.category);
+    if (category) {
+      category.brand = category.brand.filter(
+        (brandName) => brandName !== brand.brand
+      );
+      await category.save();
+    }
+
+    // ✅ Delete the brand after removing its reference from category
+    await Brand.findByIdAndDelete(req.params.id);
+
+    res.json({ message: "Brand deleted successfully" });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    console.error("Error deleting brand:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

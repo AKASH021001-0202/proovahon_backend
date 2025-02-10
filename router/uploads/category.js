@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import slugify from 'slugify';
-import { VehicleCategory } from '../../db.utils/model.js';
+import { Category } from '../../db.utils/model.js';
 
 const categoryRouter = express.Router();
 
@@ -16,32 +16,39 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    const filePath = path.resolve('uploads/categories', file.originalname);
-    
-    // Check if the file already exists
+    const uploadDir = path.resolve('uploads/categories');
+    const filePath = path.join(uploadDir, file.originalname);
+
+    // Check if file already exists
     if (fs.existsSync(filePath)) {
-      return cb(new Error('File already exists'));
+      return cb(new Error('File with the same name already exists. Please rename the file and try again.'));
     }
 
-    cb(null, Date.now() + '-' + file.originalname); // Use timestamp to prevent conflicts
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+    cb(null, uniqueSuffix + path.extname(file.originalname));
   },
 });
 
-
 const upload = multer({ storage: storage });
+
 
 // 🚀 CREATE Category (with image upload)
 categoryRouter.post('/', upload.single('img'), async (req, res) => {
   try {
-    const { vehicleCategory } = req.body;
-    if (!vehicleCategory || !vehicleCategory.trim()) {
+    const { category } = req.body;
+    if (!category ) {
       return res.status(400).json({ message: 'Category name cannot be empty' });
     }
 
-    const slug = slugify(vehicleCategory, { lower: true });
-    const img = req.file ? `/uploads/categories/${req.file.filename}` : '';
+    const slug = slugify(category, { lower: true });
+    let img = '';
 
-    const newCategory = new VehicleCategory({ vehicleCategory, img, slug });
+    if (req.file) {
+      img = `/uploads/categories/${req.file.filename}`;
+    }
+
+
+    const newCategory = new Category({ category, img, slug });
     await newCategory.save();
 
     res.status(201).json({ message: 'Category created successfully', data: newCategory });
@@ -53,7 +60,7 @@ categoryRouter.post('/', upload.single('img'), async (req, res) => {
 // 📌 READ ALL Categories
 categoryRouter.get('/', async (req, res) => {
   try {
-    const categories = await VehicleCategory.find();
+    const categories = await Category.find();
     res.status(200).json(categories);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -63,7 +70,7 @@ categoryRouter.get('/', async (req, res) => {
 // 🔍 READ Single Category by Slug
 categoryRouter.get('/:slug', async (req, res) => {
   try {
-    const category = await VehicleCategory.findOne({ slug: req.params.slug });
+    const category = await Category.findOne({ slug: req.params.slug });
     if (!category) return res.status(404).json({ message: 'Category not found' });
     res.status(200).json(category);
   } catch (error) {
@@ -74,29 +81,27 @@ categoryRouter.get('/:slug', async (req, res) => {
 // 🔄 UPDATE Category (with optional image upload)
 categoryRouter.put('/:id', upload.single('img'), async (req, res) => {
   try {
-    const { vehicleCategory } = req.body;
-    const slug = slugify(vehicleCategory, { lower: true });
+    const { category: categoryName } = req.body;
 
-    // Prepare the update data with vehicleCategory and slug
-    let updatedData = { vehicleCategory, slug };
-
-    // Only add the image if a new image is uploaded
-    if (req.file) {
-      updatedData.img = `/uploads/categories/${req.file.filename}`;
-    } else {
-      // If no new image is provided, you can leave the image unchanged
-      const existingCategory = await VehicleCategory.findById(req.params.id);
-      if (existingCategory && existingCategory.img) {
-        updatedData.img = existingCategory.img; // Retain the existing image if no new one is uploaded
-      }
+    if (!categoryName || typeof categoryName !== 'string') {
+      return res.status(400).json({ message: 'Invalid category name' });
     }
 
-    // Update the category
-    const updatedCategory = await VehicleCategory.findByIdAndUpdate(req.params.id, updatedData, { new: true });
+    const slug = slugify(categoryName, { lower: true });
 
-    if (!updatedCategory) {
+    // Prepare the update data with Category and slug
+    let updatedData = { category: categoryName, slug };
+
+    const existingCategory = await Category.findById(req.params.id);
+    if (!existingCategory) {
       return res.status(404).json({ message: 'Category not found' });
     }
+
+    // Retain existing image if no new one is uploaded
+    updatedData.img = req.file ? `/uploads/categories/${req.file.filename}` : existingCategory.img;
+
+    // Update the category
+    const updatedCategory = await Category.findByIdAndUpdate(req.params.id, updatedData, { new: true });
 
     res.status(200).json({ message: 'Category updated successfully', data: updatedCategory });
   } catch (error) {
@@ -105,18 +110,17 @@ categoryRouter.put('/:id', upload.single('img'), async (req, res) => {
 });
 
 
-
 // 🗑️ DELETE Category and Remove Image
 categoryRouter.delete("/:id", async (req, res) => {
   try {
-    const category = await VehicleCategory.findById(req.params.id);
+    const category = await Category.findById(req.params.id);
     if (!category) {
       return res.status(404).json({ message: "Category not found" });
     }
 
     // Check if an image exists and delete it
     if (category.img) {
-      const imagePath = path.resolve("uploads", category.img); // Ensure correct path
+      const imagePath = path.join(process.cwd(), category.img);
       if (fs.existsSync(imagePath)) {
         fs.unlink(imagePath, (err) => {
           if (err) {
@@ -127,7 +131,7 @@ categoryRouter.delete("/:id", async (req, res) => {
     }
 
     // Delete category from MongoDB
-    await VehicleCategory.findByIdAndDelete(req.params.id);
+    await Category.findByIdAndDelete(req.params.id);
 
     res.json({ message: "Category and image deleted successfully" });
   } catch (error) {
@@ -135,5 +139,6 @@ categoryRouter.delete("/:id", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
 
 export default categoryRouter;
